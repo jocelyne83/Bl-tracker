@@ -26,7 +26,7 @@ interface Series {
   backup_links?: BackupLink[];
 }
 
-const COUNTRIES = ['Todos', 'Tailandia', 'Corea del Sur', 'Taiwán', 'Japón', 'China', 'Filipinas'];
+const COUNTRIES = ['Todos', 'Tailandia', 'Corea del Sur', 'Japón', 'China'];
 
 export default function SeriesPage() {
   const [series, setSeries] = useState<Series[]>([]);
