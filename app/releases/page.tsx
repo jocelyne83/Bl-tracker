@@ -37,6 +37,7 @@ export default function ReleasesPage() {
 
   // Estado para la Edición
   const [editingRelease, setEditingRelease] = useState<UpcomingRelease | null>(null);
+  const [editNoteImage, setEditNoteImage] = useState('');
 
   const fetchReleases = async () => {
     setLoading(true);
@@ -55,7 +56,7 @@ export default function ReleasesPage() {
     fetchReleases();
   }, []);
 
-  // Convertir archivo local a Base64
+  // Convertir archivo local a Base64 (Póster)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isEdit = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -73,6 +74,23 @@ export default function ReleasesPage() {
       } else {
         setPosterUrl(base64String);
       }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Convertir archivo local a Base64 (Foto en Notas de Edición)
+  const handleEditNoteImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('La foto adjunta no debe pesar más de 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditNoteImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -109,6 +127,10 @@ export default function ReleasesPage() {
     e.preventDefault();
     if (!editingRelease) return;
 
+    const finalNotes = editNoteImage 
+      ? `${editingRelease.reminder_notes || ''}\n\n[IMAGEN_NOTA]:${editNoteImage}`
+      : editingRelease.reminder_notes;
+
     const { error } = await supabase
       .from('upcoming_releases')
       .update({
@@ -117,13 +139,14 @@ export default function ReleasesPage() {
         release_date: editingRelease.release_date || null,
         platform: editingRelease.platform,
         poster_url: editingRelease.poster_url || '',
-        reminder_notes: editingRelease.reminder_notes || '',
+        reminder_notes: finalNotes || '',
       })
       .eq('id', editingRelease.id);
 
     if (!error) {
       setIsEditModalOpen(false);
       setEditingRelease(null);
+      setEditNoteImage('');
       fetchReleases();
     } else {
       alert('Error al actualizar el estreno: ' + error.message);
@@ -263,6 +286,7 @@ export default function ReleasesPage() {
                         <button
                           onClick={() => {
                             setEditingRelease(item);
+                            setEditNoteImage('');
                             setImageInputType(item.poster_url?.startsWith('data:') ? 'file' : 'url');
                             setIsEditModalOpen(true);
                             setOpenMenuId(null);
@@ -302,9 +326,18 @@ export default function ReleasesPage() {
                 )}
 
                 {item.reminder_notes && (
-                  <p className="text-xs text-slate-600 bg-amber-50/60 border border-amber-100 p-2.5 rounded-2xl mb-2">
-                    📌 {item.reminder_notes}
-                  </p>
+                  <div className="text-xs text-slate-600 bg-amber-50/60 border border-amber-100 p-2.5 rounded-2xl mb-2 space-y-2">
+                    <p>📌 {item.reminder_notes.split('\n\n[IMAGEN_NOTA]:')[0]}</p>
+                    {item.reminder_notes.includes('[IMAGEN_NOTA]:') && (
+                      <div className="relative h-24 rounded-xl overflow-hidden border border-amber-200">
+                        <img 
+                          src={item.reminder_notes.split('\n\n[IMAGEN_NOTA]:')[1]} 
+                          alt="Nota adjunta" 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -434,9 +467,6 @@ export default function ReleasesPage() {
                 {posterUrl && (
                   <div className="mt-2 relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
                     <img src={posterUrl} alt="Vista previa" className="w-full h-full object-cover" />
-                    <span className="absolute top-1 left-1 bg-black/60 text-white text-[9px] px-2 py-0.5 rounded-md font-bold">
-                      Vista previa
-                    </span>
                   </div>
                 )}
               </div>
@@ -598,10 +628,36 @@ export default function ReleasesPage() {
                 <label className="block text-xs font-bold text-slate-600 mb-1">Notas de Recordatorio</label>
                 <textarea
                   rows={2}
-                  value={editingRelease.reminder_notes || ''}
+                  value={editingRelease.reminder_notes ? editingRelease.reminder_notes.split('\n\n[IMAGEN_NOTA]:')[0] : ''}
                   onChange={(e) => setEditingRelease({ ...editingRelease, reminder_notes: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
                 />
+              </div>
+
+              {/* Agregar Foto a la Nota desde el Dispositivo en Edición */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#5b63be] mb-1 flex items-center gap-1">
+                  <ImageIcon className="w-3.5 h-3.5" /> Agregar Foto a la Nota (Desde el Dispositivo)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditNoteImageUpload}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#5b63be] file:text-white hover:file:bg-[#4d53a5]"
+                />
+
+                {editNoteImage && (
+                  <div className="mt-2 relative h-24 w-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                    <img src={editNoteImage} alt="Nueva foto adjunta" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setEditNoteImage('')}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-2">

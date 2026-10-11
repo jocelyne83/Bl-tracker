@@ -187,16 +187,6 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Título Original / Nativo</label>
-              <input
-                type="text"
-                value={originalTitle}
-                onChange={(e) => setOriginalTitle(e.target.value)}
-                placeholder="Ej. 职业替身"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
-              />
-            </div>
           </div>
 
           {/* País, Tipo y Estado */}
@@ -210,10 +200,8 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
               >
                 <option value="Tailandia">🇹🇭 Tailandia</option>
                 <option value="Corea del Sur">🇰🇷 Corea del Sur</option>
-                <option value="Taiwán">🇹🇼 Taiwán</option>
                 <option value="Japón">🇯🇵 Japón</option>
                 <option value="China">🇨🇳 China / C-Drama</option>
-                <option value="Filipinas">🇵🇭 Filipinas</option>
               </select>
             </div>
 
