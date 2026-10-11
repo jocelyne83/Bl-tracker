@@ -26,30 +26,49 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
   const [status, setStatus] = useState('Viendo');
   const [rating, setRating] = useState(5);
   
-  // Manejo de la Imagen
+  // Manejo de la Imagen del Póster
   const [imageInputType, setImageInputType] = useState<'url' | 'file'>('url');
   const [posterUrl, setPosterUrl] = useState('');
   
+  // Notas Personales e Imagen Adjunta a la Nota
   const [notes, setNotes] = useState('');
+  const [noteImage, setNoteImage] = useState('');
 
   // Estado para manejar múltiples enlaces de respaldo
   const [links, setLinks] = useState<BackupLinkInput[]>([]);
 
   if (!isOpen) return null;
 
-  // Convertir archivo del dispositivo a Base64
+  // Convertir archivo del póster a Base64
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert('La imagen no debe pesar más de 2MB');
+      alert('La imagen del póster no debe pasar de 2MB');
       return;
     }
 
     const reader = new FileReader();
     reader.onloadend = () => {
       setPosterUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Convertir archivo adjunto a las notas a Base64
+  const handleNoteImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('La foto adjunta no debe pesar más de 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNoteImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -66,7 +85,6 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
     const updated = [...links];
     updated[index] = { ...updated[index], [field]: value };
     
-    // Auto-ajustar el tipo según la plataforma seleccionada
     if (field === 'platform_name') {
       const valLower = value.toLowerCase();
       if (valLower.includes('telegram')) updated[index].link_type = 'telegram';
@@ -84,6 +102,11 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Combinar el texto de las notas con la foto en Base64 si existe
+      const finalNotes = noteImage 
+        ? `${notes}\n\n[IMAGEN_NOTA]:${noteImage}`
+        : notes;
+
       // 1. Insertar la serie en Supabase
       const { data: newSeries, error: seriesError } = await supabase
         .from('series')
@@ -97,7 +120,7 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
             status,
             rating: Number(rating),
             poster_url: posterUrl,
-            notes,
+            notes: finalNotes,
           },
         ])
         .select()
@@ -128,6 +151,7 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
       setOriginalTitle('');
       setPosterUrl('');
       setNotes('');
+      setNoteImage('');
       setLinks([]);
       onSuccess();
       onClose();
@@ -163,7 +187,16 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
               />
             </div>
-            
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Título Original / Nativo</label>
+              <input
+                type="text"
+                value={originalTitle}
+                onChange={(e) => setOriginalTitle(e.target.value)}
+                placeholder="Ej. 职业替身"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
+              />
+            </div>
           </div>
 
           {/* País, Tipo y Estado */}
@@ -212,7 +245,7 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
             </div>
           </div>
 
-          {/* Calificación e Imagen */}
+          {/* Calificación e Imagen del Póster */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">Calificación (1 a 5 ⭐)</label>
@@ -226,9 +259,8 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
               />
             </div>
 
-            {/* Carga/Enlace de Imagen */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-600 mb-1.5">Imagen / Póster</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1.5">Póster Principal</label>
               
               <div className="flex gap-2 mb-2">
                 <button
@@ -251,7 +283,7 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                       : 'bg-slate-50 text-slate-600 border-slate-200'
                   }`}
                 >
-                  <Upload className="w-3.5 h-3.5" /> Subir de Galería/Archivo
+                  <Upload className="w-3.5 h-3.5" /> Subir de Galería
                 </button>
               </div>
 
@@ -272,18 +304,17 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                 />
               )}
 
-              {/* Vista previa */}
               {posterUrl && (
                 <div className="mt-2 relative h-28 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-                  <img src={posterUrl} alt="Vista previa" className="w-full h-full object-cover" />
+                  <img src={posterUrl} alt="Vista previa póster" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Notas Personales */}
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Notas Personales / Recordatorio</label>
+          {/* Notas Personales + Carga de Foto Exclusiva desde Dispositivo */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-600">Notas Personales / Recordatorio</label>
             <textarea
               rows={2}
               value={notes}
@@ -291,6 +322,34 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
               placeholder="Ej. Me quedé en el capítulo 6. Ver versión Uncut."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
             />
+
+            {/* Campo de carga de foto directo desde el dispositivo */}
+            <div>
+              <label className="block text-[11px] font-bold text-[#5b63be] mb-1 flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5" /> Agregar Foto a la Nota (Desde el Dispositivo)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleNoteImageUpload}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#5b63be] file:text-white hover:file:bg-[#4d53a5]"
+              />
+
+              {/* Vista previa de la foto de la nota */}
+              {noteImage && (
+                <div className="mt-2 relative h-24 w-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                  <img src={noteImage} alt="Foto adjunta a la nota" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setNoteImage('')}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
+                    title="Quitar foto"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* SECCIÓN: Enlaces de Respaldo */}

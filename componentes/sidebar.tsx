@@ -1,140 +1,137 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { 
+  Home, 
+  Tv, 
+  Calendar, 
+  CheckSquare, 
+  LogOut, 
+  Menu, 
+  X, 
+  Heart 
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, Tv, Calendar, CheckSquare, Heart, PanelLeftClose, PanelLeft, LogOut, UserCheck } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-const menuItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Mi Lista BL', href: '/series', icon: Tv },
-  { name: 'Próximos Estrenos', href: '/releases', icon: Calendar },
-  { name: 'Mis Tareas', href: '/tasks', icon: CheckSquare },
+const MENU_ITEMS = [
+  { name: 'Dashboard', path: '/', icon: Home },
+  { name: 'Mi Lista BL', path: '/series', icon: Tv },
+  { name: 'Próximos Estrenos', path: '/releases', icon: Calendar },
+  { name: 'Mis Tareas', path: '/tasks', icon: CheckSquare },
 ];
 
 export default function Sidebar() {
+  const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function getUserData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email || 'Abigail');
-      }
-    }
-    getUserData();
-  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    if (typeof window !== 'undefined') {
-      localStorage.clear();
-      sessionStorage.clear();
-    }
     router.push('/login');
     router.refresh();
   };
 
   return (
-    <aside
-      className={`bg-[#1b203e] text-white h-screen sticky top-0 p-4 flex flex-col justify-between transition-all duration-300 relative z-30 select-none shrink-0 ${
-        isOpen ? 'w-64' : 'w-20'
-      }`}
-    >
-      <div>
-        {/* Encabezado Principal */}
-        <div className={`flex items-center mb-8 px-2 ${isOpen ? 'justify-between' : 'justify-center'}`}>
-          {isOpen && (
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-gradient-to-tr from-[#d9539f] to-[#b654c6] rounded-2xl shadow-md">
-                <Heart className="w-5 h-5 text-white fill-white" />
-              </div>
-              <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-1">
-                BL <span className="text-[#8288d9]">Tracker</span>
-              </h1>
-            </div>
-          )}
-
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="p-2 text-slate-400 hover:text-white bg-[#262d53] hover:bg-[#2d3663] rounded-xl transition-colors"
-          >
-            {isOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
-          </button>
+    <>
+      {/* BARRA SUPERIOR PARA MÓVILES (Solo visible en pantallas pequeñas < md) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[#1b203e] text-white flex items-center justify-between px-4 z-40 shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-[#d9539f] rounded-xl text-white">
+            <Heart className="w-4 h-4 fill-white" />
+          </div>
+          <span className="font-extrabold text-base tracking-tight">
+            BL <span className="text-[#a855f7]">Tracker</span>
+          </span>
         </div>
 
-        {/* Menú de Navegación Estilo Píldora */}
-        <nav className="space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all relative ${
-                  isActive
-                    ? 'bg-gradient-to-r from-[#d9539f] to-[#c56088] text-white shadow-lg shadow-[#d9539f]/25'
-                    : 'text-slate-300 hover:text-white hover:bg-white/5'
-                } ${!isOpen ? 'justify-center' : ''}`}
-              >
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                {isOpen && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Botón Hamburguesa */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-2 text-slate-200 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+          aria-label="Abrir menú"
+        >
+          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
       </div>
 
-      {/* Bloque Inferior con Frase y Tarjeta de Usuario */}
-      <div className="space-y-6 pt-6">
-        
-        {/* Mensaje Decorativo Visual */}
-        {isOpen && (
-          <div className="px-3 relative overflow-hidden py-2">
-            <p className="text-xl font-extrabold italic text-transparent bg-clip-text bg-gradient-to-r from-[#8288d9] via-[#d9539f] to-pink-300 -rotate-3 leading-tight">
-              Más BL, <br />
-              <span className="text-2xl">más felicidad ♡</span>
-            </p>
-            
-            {/* Adorno Neón Fondo */}
-            <div className="absolute -bottom-2 -right-2 w-16 h-16 bg-[#d9539f]/20 rounded-full blur-xl pointer-events-none" />
-          </div>
-        )}
+      {/* OVERLAY PARA MÓVIL (Fondo oscuro transparente para cerrar menú al tocar afuera) */}
+      {isOpen && (
+        <div
+          onClick={() => setIsOpen(false)}
+          className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40"
+        />
+      )}
 
-        {/* Tarjeta de Sesión / Avatar y Cierre de Sesión */}
-        <div className="bg-[#242b50] border border-[#313a68] p-3 rounded-3xl space-y-3">
-          {isOpen && userEmail && (
-            <div className="flex items-center gap-3 px-1">
-              <div className="w-10 h-10 bg-[#171b33] rounded-full flex items-center justify-center font-extrabold text-white text-base border border-white/10 shrink-0">
-                {userEmail.charAt(0).toUpperCase()}
+      {/* MENÚ SIDEBAR (Desplegable en Móvil / Fijo en Escritorio) */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 w-64 bg-[#1b203e] text-white flex flex-col justify-between p-6 z-50 transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="space-y-8">
+          {/* Header del Menú en Escritorio */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-[#d9539f] rounded-2xl text-white shadow-md">
+                <Heart className="w-5 h-5 fill-white" />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Activo
-                </p>
-                <p className="text-xs text-white truncate font-bold">{userEmail.split('@')[0]}</p>
-              </div>
+              <span className="text-xl font-black tracking-tight">
+                BL <span className="text-[#a855f7]">Tracker</span>
+              </span>
             </div>
-          )}
+
+            {/* Cerrar en móvil */}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="md:hidden p-1 text-slate-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Lista de Navegación */}
+          <nav className="space-y-2">
+            {MENU_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.path;
+
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#d9539f] to-[#a855f7] text-white shadow-md shadow-pink-500/20'
+                      : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Pie de Menú: Salir */}
+        <div className="pt-6 border-t border-white/10 space-y-4">
+          <p className="text-xs font-black italic text-pink-400/80 px-2 rotate-[-2deg]">
+            Pequeños objetivos, grandes historias ♡
+          </p>
 
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-300 hover:text-white hover:bg-rose-500/20 transition-all ${
-              !isOpen ? 'justify-center' : ''
-            }`}
-            title="Cerrar sesión"
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-300 hover:text-rose-400 hover:bg-rose-500/10 rounded-2xl transition-all"
           >
-            <LogOut className="w-4 h-4 shrink-0" />
-            {isOpen && <span>Cerrar Sesión</span>}
+            <LogOut className="w-5 h-5" />
+            <span>Cerrar Sesión</span>
           </button>
         </div>
-
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

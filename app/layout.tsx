@@ -17,7 +17,9 @@ export default function RootLayout({
       <body className="bg-[#f0f2f8] text-[#1e1e38] antialiased min-h-screen">
         <div className="flex min-h-screen w-full overflow-x-hidden">
           {!isLoginPage && <Sidebar />}
-          <main className="flex-1 w-full p-8 min-w-0 overflow-y-auto bg-[#f0f2f8]">
+          
+          {/* pt-20 para espacio de la barra móvil, md:pt-8 md:pl-72 para dejar espacio al Sidebar en escritorio */}
+          <main className="flex-1 w-full pt-20 pb-8 px-4 sm:px-6 md:pt-8 md:pl-72 md:pr-8 min-w-0 overflow-y-auto bg-[#f0f2f8]">
             {children}
           </main>
         </div>
