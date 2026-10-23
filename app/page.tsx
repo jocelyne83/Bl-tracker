@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { Tv, Calendar, Heart, ArrowRight, Play, BellRing, Sparkles, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tv, Calendar, Heart, ArrowRight, Play, BellRing, Sparkles, Clock, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 
 interface Series {
   id: string;
@@ -27,12 +27,15 @@ interface UpcomingRelease {
   is_released: boolean;
 }
 
+const DAYS_MAP = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
 export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState({ total: 0, watching: 0, upcoming: 0 });
   const [watchingList, setWatchingList] = useState<Series[]>([]);
+  const [todayBroadcasts, setTodayBroadcasts] = useState<Series[]>([]);
+  const [currentDayName, setCurrentDayName] = useState('');
   
-  // Lista de estrenados traída DIRECTAMENTE de upcoming_releases
   const [recentlyPremieredReleases, setRecentlyPremieredReleases] = useState<UpcomingRelease[]>([]);
   const [nextRelease, setNextRelease] = useState<UpcomingRelease | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,16 +52,17 @@ export default function DashboardPage() {
         return;
       }
 
-      // Fecha de hoy local en formato YYYY-MM-DD
+      // Detectar el día actual de la semana en español
+      const todayIndex = new Date().getDay();
+      const dayName = DAYS_MAP[todayIndex];
+      setCurrentDayName(dayName);
+
       const now = new Date();
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       const todayISO = `${year}-${month}-${day}`;
 
-      // --------------------------------------------------------------------------
-      // 1. Promoción automática por fecha (pone is_released: true si pasó la fecha)
-      // --------------------------------------------------------------------------
       const { data: autoReleases } = await supabase
         .from('upcoming_releases')
         .select('*')
@@ -74,9 +78,6 @@ export default function DashboardPage() {
         }
       }
 
-      // --------------------------------------------------------------------------
-      // 2. Estadísticas Generales
-      // --------------------------------------------------------------------------
       const { count: totalSeries } = await supabase.from('series').select('*', { count: 'exact', head: true });
       const { count: watchingCount } = await supabase.from('series').select('*', { count: 'exact', head: true }).eq('status', 'Viendo');
       const { count: upcomingCount } = await supabase.from('upcoming_releases').select('*', { count: 'exact', head: true }).eq('is_released', false);
@@ -87,19 +88,22 @@ export default function DashboardPage() {
         upcoming: upcomingCount || 0,
       });
 
-      // --------------------------------------------------------------------------
-      // 3. Continuar Viendo
-      // --------------------------------------------------------------------------
       const { data: watchingData } = await supabase
         .from('series')
         .select('*')
         .eq('status', 'Viendo')
-        .limit(2);
-      if (watchingData) setWatchingList(watchingData as Series[]);
+        .order('created_at', { ascending: false });
+      
+      if (watchingData) {
+        setWatchingList(watchingData as Series[]);
 
-      // --------------------------------------------------------------------------
-      // 4. Estrenadas Recientemente: Traídas DIRECTAMENTE de 'upcoming_releases' con is_released = true
-      // --------------------------------------------------------------------------
+        // Filtrar series que se transmiten hoy según su nota de día de emisión
+        const broadcastingToday = (watchingData as Series[]).filter((item) => {
+          return item.notes && item.notes.includes(`📅 Día de emisión: ${dayName}`);
+        });
+        setTodayBroadcasts(broadcastingToday);
+      }
+
       const { data: premieredData } = await supabase
         .from('upcoming_releases')
         .select('*')
@@ -110,9 +114,6 @@ export default function DashboardPage() {
         setRecentlyPremieredReleases(premieredData as UpcomingRelease[]);
       }
 
-      // --------------------------------------------------------------------------
-      // 5. Próximo Estreno Inminente Futuro (is_released = false)
-      // --------------------------------------------------------------------------
       const { data: nextReleaseData } = await supabase
         .from('upcoming_releases')
         .select('*')
@@ -146,67 +147,105 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Encabezado */}
       <div>
-        <h1 className="text-4xl font-extrabold bg-gradient-to-r from-[#20274c] via-[#5b63be] to-[#8288d9] bg-clip-text text-transparent">
+        <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-[#20274c] via-[#5b63be] to-[#8288d9] bg-clip-text text-transparent">
           Dashboard General
         </h1>
-        <p className="text-[#64748b] text-sm mt-1 font-medium">Resumen de tu biblioteca BL y próximos lanzamientos.</p>
+        <p className="text-[#64748b] text-xs sm:text-sm mt-1 font-medium">Resumen de tu biblioteca BL y próximos lanzamientos.</p>
       </div>
 
-      {/* Tarjetas de Estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link 
-          href="/series" 
-          className="bg-[#5b63be] p-6 rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#5b63be]/20 hover:scale-[1.02] transition-transform"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3.5 bg-white/20 backdrop-blur-md rounded-2xl text-white">
-              <Tv className="w-6 h-6" />
+      {/* 🚀 BANNER DINÁMICO DE ACCESO RÁPIDO: HOY SE TRANSMITE */}
+      {todayBroadcasts.length > 0 && (
+        <div className="bg-gradient-to-r from-[#d9539f] to-[#a855f7] p-5 rounded-3xl text-white shadow-lg shadow-pink-500/20 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl text-white">
+              <Flame className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-200">Total en Biblioteca</p>
-              <p className="text-4xl font-extrabold mt-0.5">{stats.total}</p>
+              <span className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-2.5 py-0.5 rounded-full text-white">
+                ¡Hoy es {currentDayName}! 🔥
+              </span>
+              <h2 className="text-lg font-black mt-1">
+                ¡Nuevos capítulos de emisión hoy!
+              </h2>
+              <p className="text-xs text-white/90">
+                Tienes {todayBroadcasts.length} serie(s) programada(s) para hoy en tu lista.
+              </p>
             </div>
           </div>
-          <div className="p-2.5 bg-white/20 rounded-full text-white">
+
+          <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+            {todayBroadcasts.map((series) => (
+              <div key={series.id} className="bg-white/10 backdrop-blur-md px-3 py-2 rounded-2xl border border-white/20 flex items-center gap-2 shrink-0">
+                <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800">
+                  {series.poster_url ? (
+                    <img src={series.poster_url} alt={series.title} className="w-full h-full object-cover" />
+                  ) : null}
+                </div>
+                <div>
+                  <p className="text-xs font-bold truncate max-w-[120px]">{series.title}</p>
+                  <span className="text-[9px] text-pink-200">¡Disponible hoy!</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tarjetas de Estadísticas (Acomodo responsivo en grid compacto) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <Link 
+          href="/series" 
+          className="bg-[#5b63be] p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#5b63be]/20 hover:scale-[1.02] transition-transform"
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-3 bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl text-white">
+              <Tv className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-200">Total en Biblioteca</p>
+              <p className="text-2xl sm:text-4xl font-extrabold mt-0.5">{stats.total}</p>
+            </div>
+          </div>
+          <div className="p-2 bg-white/20 rounded-full text-white">
             <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
 
         <Link 
           href="/series" 
-          className="bg-[#c56088] p-6 rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#c56088]/20 hover:scale-[1.02] transition-transform"
+          className="bg-[#c56088] p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#c56088]/20 hover:scale-[1.02] transition-transform"
         >
-          <div className="flex items-center gap-4">
-            <div className="p-3.5 bg-white/20 backdrop-blur-md rounded-2xl text-white">
-              <Heart className="w-6 h-6 fill-white" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-3 bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl text-white">
+              <Heart className="w-5 h-5 sm:w-6 sm:h-6 fill-white" />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-rose-100">Viendo Actualmente</p>
-              <p className="text-4xl font-extrabold mt-0.5">{stats.watching}</p>
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-100">Viendo Actualmente</p>
+              <p className="text-2xl sm:text-4xl font-extrabold mt-0.5">{stats.watching}</p>
             </div>
           </div>
-          <div className="p-2.5 bg-white/20 rounded-full text-white">
+          <div className="p-2 bg-white/20 rounded-full text-white">
             <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
 
         <Link 
           href="/releases" 
-          className="bg-[#4878a4] p-6 rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#4878a4]/20 hover:scale-[1.02] transition-transform"
+          className="bg-[#4878a4] p-4 sm:p-6 rounded-2xl sm:rounded-3xl flex items-center justify-between text-white shadow-lg shadow-[#4878a4]/20 hover:scale-[1.02] transition-transform"
         >
-          <div className="flex items-center gap-4">
-            <div className="p-3.5 bg-white/20 backdrop-blur-md rounded-2xl text-white">
-              <Calendar className="w-6 h-6" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-3 bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl text-white">
+              <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-100">Próximos Estrenos</p>
-              <p className="text-4xl font-extrabold mt-0.5">{stats.upcoming}</p>
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-100">Próximos Estrenos</p>
+              <p className="text-2xl sm:text-4xl font-extrabold mt-0.5">{stats.upcoming}</p>
             </div>
           </div>
-          <div className="p-2.5 bg-white/20 rounded-full text-white">
+          <div className="p-2 bg-white/20 rounded-full text-white">
             <ArrowRight className="w-4 h-4" />
           </div>
         </Link>
@@ -215,10 +254,10 @@ export default function DashboardPage() {
       {/* Disposición Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
-        {/* Izquierda: Continuar Viendo */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200/60 shadow-sm space-y-4">
+        {/* Izquierda: Continuar Viendo (Convertido en Carrusel Horizontal) */}
+        <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-3xl border border-slate-200/60 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-[#1e1e38] flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-bold text-[#1e1e38] flex items-center gap-2">
               <span className="p-1.5 bg-[#d9539f] text-white rounded-full">
                 <Play className="w-3.5 h-3.5 fill-white" />
               </span> 
@@ -230,34 +269,48 @@ export default function DashboardPage() {
           </div>
 
           {watchingList.length === 0 ? (
-            <div className="bg-[#f3f4fa] rounded-2xl p-8 text-center text-slate-500 text-sm">
+            <div className="bg-[#f3f4fa] rounded-2xl p-8 text-center text-slate-500 text-xs sm:text-sm">
               No tienes series en estado "Viendo" en este momento.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {watchingList.map((item) => (
-                <div key={item.id} className="bg-[#f3f4fa] rounded-2xl p-4 flex flex-col justify-between border border-slate-100">
-                  <div>
-                    <div className="relative h-44 bg-slate-200 rounded-xl overflow-hidden mb-3">
-                      {item.poster_url ? (
-                        <img src={item.poster_url} alt={item.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Sin Póster</div>
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-200">
+              {watchingList.map((item) => {
+                const cleanNote = item.notes ? item.notes.split('\n\n[IMAGEN_NOTA]:')[0] : '';
+
+                return (
+                  <div 
+                    key={item.id} 
+                    className="snap-start shrink-0 w-64 sm:w-72 bg-[#f8fafc] rounded-2xl p-3 flex flex-col justify-between border border-slate-100 shadow-xs"
+                  >
+                    <div>
+                      <div className="relative h-44 sm:h-48 bg-slate-200 rounded-xl overflow-hidden mb-3">
+                        {item.poster_url ? (
+                          <img src={item.poster_url} alt={item.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Sin Póster</div>
+                        )}
+                        <span className="absolute top-2 left-2 bg-[#1b203e]/80 backdrop-blur-md text-[10px] px-2 py-0.5 rounded-full text-white font-semibold">
+                          {item.country}
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-[#1e1e38] text-sm line-clamp-1">{item.title}</h3>
+                      {cleanNote && (
+                        <p className="text-[11px] text-slate-600 mt-1.5 line-clamp-2 bg-white p-2 rounded-lg border border-slate-200/50">
+                          💡 {cleanNote}
+                        </p>
                       )}
-                      <span className="absolute top-2 left-2 bg-[#1b203e]/80 backdrop-blur-md text-[10px] px-2 py-0.5 rounded-full text-white font-semibold">
-                        {item.country}
-                      </span>
                     </div>
 
-                    <h3 className="font-bold text-[#1e1e38] text-sm line-clamp-1">{item.title}</h3>
-                    {item.notes && (
-                      <p className="text-xs text-slate-600 mt-1.5 line-clamp-2 bg-white p-2 rounded-lg border border-slate-200/50">
-                        💡 {item.notes}
-                      </p>
-                    )}
+                    <Link
+                      href="/series"
+                      className="mt-3 w-full py-2 bg-[#d9539f] hover:bg-[#c4448c] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Play className="w-3 h-3 fill-white" /> Ver detalles
+                    </Link>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -323,7 +376,7 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* 2. Tarjeta Abajo: Series Estrenadas Recientemente (Lee de upcoming_releases donde is_released = true) */}
+          {/* 2. Tarjeta Abajo: Series Estrenadas Recientemente */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200/60 shadow-sm space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-bold text-[#1e1e38] flex items-center gap-1.5">
@@ -351,7 +404,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Carrusel del contenido filtrado */}
             {recentlyPremieredReleases.length === 0 ? (
               <div className="bg-[#f3f4fa] rounded-2xl p-4 text-center text-slate-400 text-xs">
                 Aún no hay estrenos marcados como lanzados.

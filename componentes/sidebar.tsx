@@ -11,7 +11,8 @@ import {
   LogOut, 
   Menu, 
   X, 
-  Heart 
+  Heart,
+  CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ const MENU_ITEMS = [
   { name: 'Dashboard', path: '/', icon: Home },
   { name: 'Mi Lista BL', path: '/series', icon: Tv },
   { name: 'Próximos Estrenos', path: '/releases', icon: Calendar },
+  { name: 'Calendario', path: '/calendar', icon: CalendarDays },
   { name: 'Mis Tareas', path: '/tasks', icon: CheckSquare },
 ];
 

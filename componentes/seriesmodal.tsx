@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { X, Plus, Trash2, Link as LinkIcon, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, Link as LinkIcon, Upload, CalendarDays, Tv } from 'lucide-react';
 
 interface SeriesModalProps {
   isOpen: boolean;
@@ -17,29 +17,38 @@ interface BackupLinkInput {
   notes: string;
 }
 
+const DAYS_OF_WEEK = [
+  'Por definir',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo'
+];
+
 export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalProps) {
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
-  const [originalTitle, setOriginalTitle] = useState('');
   const [country, setCountry] = useState('Tailandia');
   const [type, setType] = useState('Serie');
   const [status, setStatus] = useState('Viendo');
   const [rating, setRating] = useState(5);
+  const [broadcastDay, setBroadcastDay] = useState('Por definir');
+  const [releaseDate, setReleaseDate] = useState('');
   
-  // Manejo de la Imagen del Póster
+  const [currentEpisode, setCurrentEpisode] = useState(1);
+  const [totalEpisodes, setTotalEpisodes] = useState(12);
+
   const [imageInputType, setImageInputType] = useState<'url' | 'file'>('url');
   const [posterUrl, setPosterUrl] = useState('');
   
-  // Notas Personales e Imagen Adjunta a la Nota
   const [notes, setNotes] = useState('');
-  const [noteImage, setNoteImage] = useState('');
-
-  // Estado para manejar múltiples enlaces de respaldo
   const [links, setLinks] = useState<BackupLinkInput[]>([]);
 
   if (!isOpen) return null;
 
-  // Convertir archivo del póster a Base64
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -52,23 +61,6 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
     const reader = new FileReader();
     reader.onloadend = () => {
       setPosterUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Convertir archivo adjunto a las notas a Base64
-  const handleNoteImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-      alert('La foto adjunta no debe pesar más de 2MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNoteImage(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -102,25 +94,26 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Combinar el texto de las notas con la foto en Base64 si existe
-      const finalNotes = noteImage 
-        ? `${notes}\n\n[IMAGEN_NOTA]:${noteImage}`
-        : notes;
+      let preparedNotes = notes;
+      if (broadcastDay && broadcastDay !== 'Por definir') {
+        preparedNotes = `📅 Día de emisión: ${broadcastDay}\n${preparedNotes}`;
+      }
 
-      // 1. Insertar la serie en Supabase
       const { data: newSeries, error: seriesError } = await supabase
         .from('series')
         .insert([
           {
             user_id: user?.id,
             title,
-            original_title: originalTitle,
             country,
             type,
             status,
             rating: Number(rating),
+            current_episode: Number(currentEpisode),
+            total_episodes: Number(totalEpisodes),
+            release_date: releaseDate || null,
             poster_url: posterUrl,
-            notes: finalNotes,
+            notes: preparedNotes,
           },
         ])
         .select()
@@ -128,7 +121,6 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
 
       if (seriesError) throw seriesError;
 
-      // 2. Insertar los enlaces de respaldo asociados
       if (links.length > 0 && newSeries) {
         const linksToInsert = links
           .filter((l) => l.url.trim() !== '')
@@ -146,12 +138,13 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
         }
       }
 
-      // Limpiar formulario y cerrar
       setTitle('');
-      setOriginalTitle('');
       setPosterUrl('');
       setNotes('');
-      setNoteImage('');
+      setReleaseDate('');
+      setCurrentEpisode(1);
+      setTotalEpisodes(12);
+      setBroadcastDay('Por definir');
       setLinks([]);
       onSuccess();
       onClose();
@@ -174,23 +167,19 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Título y Título Original */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Título de la Serie *</label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ej. My Stand-In"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">Título de la Serie *</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej. My Stand-In"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
+            />
           </div>
 
-          {/* País, Tipo y Estado */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">País</label>
               <select
@@ -231,33 +220,83 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                 <option value="Re-viendo">Re-viendo</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center gap-1">
+                <CalendarDays className="w-3.5 h-3.5 text-[#5b63be]" /> Transmisión
+              </label>
+              <select
+                value={broadcastDay}
+                onChange={(e) => setBroadcastDay(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
+              >
+                {DAYS_OF_WEEK.map((day) => (
+                  <option key={day} value={day}>{day}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Calificación e Imagen del Póster */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+          {/* Fecha de estreno + Capítulos */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Calificación (1 a 5 ⭐)</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">📅 Fecha Estreno</label>
+              <input
+                type="date"
+                value={releaseDate}
+                onChange={(e) => setReleaseDate(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
+              />
+            </div>
+
+            {type !== 'Película' && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Cap. Actual</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={currentEpisode}
+                    onChange={(e) => setCurrentEpisode(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Total Capítulos</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={totalEpisodes}
+                    onChange={(e) => setTotalEpisodes(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none"
+                  />
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Calificación ⭐</label>
               <input
                 type="number"
                 min="1"
                 max="5"
                 value={rating}
                 onChange={(e) => setRating(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none"
               />
             </div>
+          </div>
 
-            <div className="md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+            <div className="md:col-span-3">
               <label className="block text-xs font-bold text-slate-600 mb-1.5">Póster Principal</label>
-              
               <div className="flex gap-2 mb-2">
                 <button
                   type="button"
                   onClick={() => setImageInputType('url')}
                   className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all ${
-                    imageInputType === 'url'
-                      ? 'bg-[#5b63be] text-white border-[#5b63be]'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                    imageInputType === 'url' ? 'bg-[#5b63be] text-white border-[#5b63be]' : 'bg-slate-50 text-slate-600 border-slate-200'
                   }`}
                 >
                   <LinkIcon className="w-3.5 h-3.5" /> Enlace URL
@@ -266,9 +305,7 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
                   type="button"
                   onClick={() => setImageInputType('file')}
                   className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all ${
-                    imageInputType === 'file'
-                      ? 'bg-[#5b63be] text-white border-[#5b63be]'
-                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                    imageInputType === 'file' ? 'bg-[#5b63be] text-white border-[#5b63be]' : 'bg-slate-50 text-slate-600 border-slate-200'
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5" /> Subir de Galería
@@ -300,127 +337,29 @@ export default function SeriesModal({ isOpen, onClose, onSuccess }: SeriesModalP
             </div>
           </div>
 
-          {/* Notas Personales + Carga de Foto Exclusiva desde Dispositivo */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-600">Notas Personales / Recordatorio</label>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">Notas Personales</label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ej. Me quedé en el capítulo 6. Ver versión Uncut."
+              placeholder="Ej. Ver versión Uncut."
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
             />
-
-            {/* Campo de carga de foto directo desde el dispositivo */}
-            <div>
-              <label className="block text-[11px] font-bold text-[#5b63be] mb-1 flex items-center gap-1">
-                <ImageIcon className="w-3.5 h-3.5" /> Agregar Foto a la Nota (Desde el Dispositivo)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleNoteImageUpload}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#5b63be] file:text-white hover:file:bg-[#4d53a5]"
-              />
-
-              {/* Vista previa de la foto de la nota */}
-              {noteImage && (
-                <div className="mt-2 relative h-24 w-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-                  <img src={noteImage} alt="Foto adjunta a la nota" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setNoteImage('')}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
-                    title="Quitar foto"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* SECCIÓN: Enlaces de Respaldo */}
-          <div className="border-t border-slate-100 pt-3">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-[#5b63be] flex items-center gap-1.5">
-                <LinkIcon className="w-3.5 h-3.5" /> Enlaces de Respaldo (Telegram, MEGA, Web)
-              </label>
-              <button
-                type="button"
-                onClick={addLinkField}
-                className="text-xs bg-[#f3f4fa] hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-xl font-bold flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5 text-[#5b63be]" /> Agregar Enlace
-              </button>
-            </div>
-
-            {links.length === 0 && (
-              <p className="text-xs text-slate-400 italic bg-[#f3f4fa] p-2.5 rounded-xl border border-slate-100">
-                No has agregado enlaces aún. Puedes guardar tu link de Telegram, carpeta de MEGA o servidor web.
-              </p>
-            )}
-
-            <div className="space-y-2">
-              {links.map((link, idx) => (
-                <div key={idx} className="bg-[#f3f4fa] p-2.5 rounded-2xl border border-slate-100 space-y-2">
-                  <div className="flex gap-2 items-center">
-                    <select
-                      value={link.platform_name}
-                      onChange={(e) => updateLinkField(idx, 'platform_name', e.target.value)}
-                      className="bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none"
-                    >
-                      <option value="Telegram">Telegram ✈️</option>
-                      <option value="MEGA">MEGA ☁️</option>
-                      <option value="Google Drive">Google Drive 📁</option>
-                      <option value="YouTube">YouTube 📺</option>
-                      <option value="iQIYI">iQIYI 🟢</option>
-                      <option value="Viki">Viki 🟣</option>
-                      <option value="Otro">Otro / Servidor</option>
-                    </select>
-
-                    <input
-                      type="text"
-                      placeholder="URL o Enlace (https://t.me/... o https://mega.nz/...)"
-                      value={link.url}
-                      onChange={(e) => updateLinkField(idx, 'url', e.target.value)}
-                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#d9539f]"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => removeLinkField(idx)}
-                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Nota corta del enlace (ej: 'Cap 1-12', 'Subtítulos en español')"
-                    value={link.notes}
-                    onChange={(e) => updateLinkField(idx, 'notes', e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1 text-xs text-slate-600 focus:outline-none"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Botones de Acción */}
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="w-1/2 sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-xs transition-colors"
+              className="w-1/2 sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-xs"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="w-1/2 sm:w-auto bg-[#d9539f] hover:bg-[#c4448c] text-white font-bold px-6 py-2.5 rounded-xl text-xs transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="w-1/2 sm:w-auto bg-[#d9539f] hover:bg-[#c4448c] text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md disabled:opacity-50"
             >
               {loading ? 'Guardando...' : 'Guardar Serie'}
             </button>
