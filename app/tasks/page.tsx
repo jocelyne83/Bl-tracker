@@ -84,10 +84,6 @@ export default function TasksPage() {
       {/* 1. Encabezado Estilizado */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-white via-[#f0f2f8] to-[#e8eaf6] p-6 sm:p-8 border border-white/80 shadow-xs">
         <div className="relative z-10 max-w-xl space-y-1">
-          <div className="flex items-center gap-1.5 text-[#a855f7] font-bold text-sm">
-            <Sparkles className="w-4 h-4 fill-[#a855f7]" />
-            <span>¡Hola, Abigail!</span>
-          </div>
 
           <h1 className="text-4xl sm:text-5xl font-black text-[#1e1e38] tracking-tight">
             Organizador de <span className="text-[#8b5cf6] relative inline-block">
